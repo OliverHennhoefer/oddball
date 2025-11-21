@@ -1,6 +1,6 @@
 """oddball anomaly detection datasets."""
 
-from oddball.data.loader import (
+from .data.loader import (
     clear_cache,
     get_cache_location,
     list_available,
