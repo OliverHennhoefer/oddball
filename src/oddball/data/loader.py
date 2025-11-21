@@ -16,10 +16,13 @@ from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 import numpy as np
+import pandas as pd
 
-from .config import load_settings
-from .enums import Dataset
+from oddball.config import load_settings
+from oddball.enums import Dataset
+
 from .registry import DATASET_FILES
+from .setup import create_setup
 
 
 class DatasetManager:
@@ -55,8 +58,26 @@ class DatasetManager:
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         return self._cache_dir
 
-    def load(self, dataset: Dataset | str) -> tuple[np.ndarray, np.ndarray]:
-        """Load a dataset and return the raw feature and label arrays."""
+    def load(
+        self,
+        dataset: Dataset | str,
+        *,
+        setup: bool = False,
+        as_dataframe: bool = False,
+        seed: int | None = None,
+    ) -> (
+        tuple[np.ndarray, np.ndarray]
+        | tuple[pd.DataFrame, pd.DataFrame, pd.Series]
+        | pd.DataFrame
+    ):
+        """Load a dataset and return arrays, a DataFrame, or a setup split.
+
+        When ``setup`` is ``True``, a DataFrame-based train/test split is
+        returned where the training data only contains normal samples (Class 0)
+        and the test set is a mix of normal and anomalous samples.
+        When ``as_dataframe`` is ``True``, the full dataset is returned as a
+        DataFrame with generated column names and a ``Class`` column.
+        """
         name = self._normalize_name(dataset)
         filename = self._get_filename(name)
 
@@ -64,7 +85,17 @@ class DatasetManager:
         buffer = io.BytesIO(npz_bytes)
         npz = np.load(buffer)
 
-        return npz["X"], npz["y"]
+        if not setup and not as_dataframe:
+            return npz["X"], npz["y"]
+
+        column_names = [f"V{i + 1}" for i in range(npz["X"].shape[1])]
+        df = pd.DataFrame(npz["X"], columns=column_names)
+        df["Class"] = npz["y"]
+
+        if not setup and as_dataframe:
+            return df
+
+        return create_setup(df, seed)
 
     def split_by_label(
         self, dataset: Dataset | str, *, as_numpy: bool = False
@@ -215,9 +246,17 @@ _manager = DatasetManager()
 
 def load(
     dataset: Dataset | str,
-) -> tuple[np.ndarray, np.ndarray]:
+    *,
+    setup: bool = False,
+    as_dataframe: bool = False,
+    seed: int | None = None,
+) -> (
+    tuple[np.ndarray, np.ndarray]
+    | tuple[pd.DataFrame, pd.DataFrame, pd.Series]
+    | pd.DataFrame
+):
     """Public wrapper for :meth:`DatasetManager.load`."""
-    return _manager.load(dataset)
+    return _manager.load(dataset, setup=setup, as_dataframe=as_dataframe, seed=seed)
 
 
 def split_by_label(

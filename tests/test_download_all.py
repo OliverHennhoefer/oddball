@@ -4,7 +4,7 @@ import os
 import pytest
 
 from oddball import clear_cache, get_cache_location, list_available, load
-from oddball.registry import DATASET_FILES
+from oddball.data.registry import DATASET_FILES
 
 
 @pytest.fixture(scope="session")

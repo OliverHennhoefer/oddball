@@ -1,11 +1,12 @@
 import io
 
+import pandas as pd
 import numpy as np
 import pytest
 
 from oddball import Dataset, clear_cache, list_available, load, split_by_label
-from oddball.datasets import DatasetManager
-from oddball.registry import DATASET_FILES
+from oddball.data.loader import DatasetManager
+from oddball.data.registry import DATASET_FILES
 
 
 @pytest.fixture(autouse=True)
@@ -80,3 +81,41 @@ def test_split_by_label_returns_views(mock_download):  # noqa: ARG001
     assert isinstance(normal, np.ndarray)
     assert isinstance(anomaly, np.ndarray)
     assert normal.shape[1] == anomaly.shape[1]
+
+
+def test_load_with_setup_returns_split(monkeypatch, sample_npz_bytes):
+    payload = sample_npz_bytes(n_rows=200, n_features=5)
+
+    def fake_download(self, filename: str) -> bytes:  # noqa: ARG001
+        return payload
+
+    monkeypatch.setattr(DatasetManager, "_download", fake_download)
+
+    x_train, x_test, y_test = load(Dataset.COVER, setup=True, seed=123)
+
+    assert isinstance(x_train, pd.DataFrame)
+    assert isinstance(x_test, pd.DataFrame)
+    assert isinstance(y_test, pd.Series)
+    assert "Class" not in x_train.columns
+    assert "Class" not in x_test.columns
+    assert x_train.shape[1] == x_test.shape[1]
+    assert set(y_test.unique()) <= {0, 1}
+
+    npz = np.load(io.BytesIO(payload))
+    df = pd.DataFrame(npz["X"])
+    df["Class"] = npz["y"]
+
+    normal_count = int((df["Class"] == 0).sum())
+    anomaly_count = int((df["Class"] == 1).sum())
+    expected_train = normal_count // 2
+    expected_test = min(1000, expected_train // 3)
+    expected_outlier = min(expected_test // 10, anomaly_count)
+    expected_normal = min(
+        expected_test - expected_outlier, normal_count - expected_train
+    )
+
+    assert len(x_train) == expected_train
+    assert len(y_test) == expected_normal + expected_outlier
+    assert df.loc[x_train.index, "Class"].eq(0).all()
+    if expected_outlier:
+        assert (y_test == 1).sum() == expected_outlier

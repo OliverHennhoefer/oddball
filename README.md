@@ -22,6 +22,19 @@ print("Available:", list_available())
 
 X, y = load(Dataset.COVER)           # raw arrays
 normal, anomaly = split_by_label("cover")  # feature slices
+
+# Generators for batch/online experimentation
+from oddball import BatchGenerator, OnlineGenerator
+
+batch_gen = BatchGenerator(
+    load_data_func=lambda: load(Dataset.COVER, as_dataframe=True),
+    batch_size=32,
+    anomaly_proportion=0.1,
+    seed=42,
+)
+for x_batch, y_batch in batch_gen.generate():
+    print(f"Batch: {x_batch.shape}, anomalies: {y_batch.sum()}")
+    break
 ```
 
 ## Configuration
