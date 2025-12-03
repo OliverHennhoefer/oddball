@@ -89,8 +89,8 @@ class DatasetManager:
             return npz["X"].astype(np.float64), npz["y"].astype(np.float64)
 
         column_names = [f"V{i + 1}" for i in range(npz["X"].shape[1])]
-        df = pd.DataFrame(npz["X"], columns=column_names)
-        df["Class"] = npz["y"]
+        df = pd.DataFrame(npz["X"].astype(np.float64), columns=column_names)
+        df["Class"] = npz["y"].astype(np.float64)
 
         if not setup and as_dataframe:
             return df
