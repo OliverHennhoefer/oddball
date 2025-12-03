@@ -136,15 +136,15 @@ class BaseDataGenerator(ABC):
 
         return self.rng.random() < self.anomaly_proportion
 
-    def _sample_instance(self, is_anomaly: bool) -> tuple[pd.DataFrame, int]:
+    def _sample_instance(self, is_anomaly: bool) -> tuple[pd.DataFrame, float]:
         if is_anomaly:
             idx = self.rng.integers(0, self.n_anomaly)
             instance = self.x_anomaly.iloc[[idx]].reset_index(drop=True)
-            label = 1
+            label = 1.0
         else:
             idx = self.rng.integers(0, self.n_normal)
             instance = self.x_normal.iloc[[idx]].reset_index(drop=True)
-            label = 0
+            label = 0.0
 
         return instance, label
 

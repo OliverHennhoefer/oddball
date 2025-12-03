@@ -29,7 +29,7 @@ Issues = "https://github.com/OliverHennhoefer/oddball/issues"
 tests = ["pytest>=7.4"]
 
 [tool.hatch.version]
-path = "src/oddball/__init__.py"
+path = "oddball/__init__.py"
 
 [build-system]
 requires = ["hatchling"]

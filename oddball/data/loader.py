@@ -86,7 +86,7 @@ class DatasetManager:
         npz = np.load(buffer)
 
         if not setup and not as_dataframe:
-            return npz["X"], npz["y"]
+            return npz["X"].astype(np.float64), npz["y"].astype(np.float64)
 
         column_names = [f"V{i + 1}" for i in range(npz["X"].shape[1])]
         df = pd.DataFrame(npz["X"], columns=column_names)

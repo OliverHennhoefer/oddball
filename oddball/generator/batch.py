@@ -79,7 +79,7 @@ class BatchGenerator(BaseDataGenerator):
                     batch_labels.append(label)
 
                 x_batch = pd.concat(batch_data, axis=0, ignore_index=True)
-                y_batch = pd.Series(batch_labels, dtype=int)
+                y_batch = pd.Series(batch_labels, dtype=float)
 
                 shuffle_idx = self.rng.permutation(self.batch_size)
                 x_batch = x_batch.iloc[shuffle_idx].reset_index(drop=True)
@@ -100,7 +100,7 @@ class BatchGenerator(BaseDataGenerator):
                     self._items_generated += 1
 
                 x_batch = pd.concat(batch_data, axis=0, ignore_index=True)
-                y_batch = pd.Series(batch_labels, dtype=int)
+                y_batch = pd.Series(batch_labels, dtype=float)
 
             yield x_batch, y_batch
             batch_count += 1
