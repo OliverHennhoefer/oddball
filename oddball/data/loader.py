@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import io
 import shutil
+import time
+import warnings
 from collections import OrderedDict
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
@@ -27,6 +29,10 @@ from .setup import create_setup
 
 class DatasetManager:
     """Manage dataset download, caching, and loading."""
+
+    max_retries = 5
+    base_delay = 2.0
+    _retryable_codes = frozenset({429, 500, 502, 503, 504})
 
     def __init__(self) -> None:
         self._settings = load_settings()
@@ -170,13 +176,30 @@ class DatasetManager:
 
         url = urljoin(self.base_url, filename)
         req = Request(url, headers={"User-Agent": "oddball-datasets/0.1"})
-        try:
-            with urlopen(req) as response:  # noqa: S310 - controlled URL
-                data = response.read()
-        except URLError as exc:  # pragma: no cover - network failure path
+
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries):
+            try:
+                with urlopen(req) as response:  # noqa: S310 - controlled URL
+                    data = response.read()
+                break
+            except (HTTPError, URLError) as exc:
+                last_exc = exc
+                if not self._is_retryable(exc) or attempt == self.max_retries - 1:
+                    raise URLError(
+                        f"Failed to download dataset asset {filename}: {exc}"
+                    ) from exc
+                delay = self.base_delay * (2**attempt)
+                warnings.warn(
+                    f"Retry {attempt + 1}/{self.max_retries} for {filename} "
+                    f"after {exc}, waiting {delay:.0f}s...",
+                    stacklevel=4,
+                )
+                time.sleep(delay)
+        else:
             raise URLError(
-                f"Failed to download dataset asset {filename}: {exc}"
-            ) from exc
+                f"Failed to download dataset asset {filename}: {last_exc}"
+            ) from last_exc
 
         self._add_to_memory_cache(filename, data)
         try:
@@ -187,6 +210,12 @@ class DatasetManager:
             pass
 
         return data
+
+    def _is_retryable(self, exc: Exception) -> bool:
+        """Check if error is transient and worth retrying."""
+        if isinstance(exc, HTTPError):
+            return exc.code in self._retryable_codes
+        return isinstance(exc, URLError)
 
     def _cleanup_old_versions(self) -> None:
         cache_root = self.cache_dir.parent
